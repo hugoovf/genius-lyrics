@@ -10,6 +10,7 @@ from requests.exceptions import (
 )
 
 from homeassistant.components.media_player import (
+    ATTR_MEDIA_ALBUM_NAME,
     ATTR_MEDIA_ARTIST,
     ATTR_MEDIA_CONTENT_TYPE,
     # ATTR_MEDIA_DURATION,
@@ -46,7 +47,7 @@ from .const import (
     INTEGRATION_NAME,
 )
 from .genius import GeniusPatched
-from .helpers import clean_artist_name, clean_song_title, cleanup_lyrics, get_media_player_entities
+from .helpers import clean_song_title, cleanup_lyrics, get_media_player_entities, parse_artist_album
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,10 +97,12 @@ class GeniusLyricsSensor(SensorEntity):
         """Reset sensor state and attributes."""
         self._media_artist = None
         self._media_title = None
+        self._media_album = None
         self._state = STATE_OFF
         self._attr_entity_picture = None
         self._attr_extra_state_attributes[ATTR_MEDIA_ARTIST] = None
         self._attr_extra_state_attributes[ATTR_MEDIA_TITLE] = None
+        self._attr_extra_state_attributes[ATTR_MEDIA_ALBUM_NAME] = None
         self._attr_extra_state_attributes[ATTR_MEDIA_LYRICS] = None
         self._attr_extra_state_attributes[ATTR_MEDIA_IMAGE] = None
         self._attr_extra_state_attributes[ATTR_MEDIA_PYONG_COUNT] = None
@@ -118,12 +121,17 @@ class GeniusLyricsSensor(SensorEntity):
             _LOGGER.error("Cannot fetch lyrics without artist and title")
             return
 
-        # clean artist name to remove album info and increase accuracy
-        cleaned_artist = clean_artist_name(self._media_artist)
+        # parse artist name and extract album info from combined field
+        cleaned_artist, extracted_album = parse_artist_album(self._media_artist)
         if cleaned_artist != self._media_artist:
             _LOGGER.info(
                 f'Media artist was cleaned: "{self._media_artist}"  ->  "{cleaned_artist}"'
             )
+            if extracted_album:
+                _LOGGER.info(f'Extracted album name: "{extracted_album}"')
+                # Use extracted album if current album is empty
+                if not self._media_album:
+                    self._media_album = extracted_album
             self._media_artist = cleaned_artist
 
         # clean song title to increase chance and accuracy of a result
@@ -158,6 +166,7 @@ class GeniusLyricsSensor(SensorEntity):
 
         self._attr_extra_state_attributes[ATTR_MEDIA_ARTIST] = self._media_artist
         self._attr_extra_state_attributes[ATTR_MEDIA_TITLE] = self._media_title
+        self._attr_extra_state_attributes[ATTR_MEDIA_ALBUM_NAME] = self._media_album
 
         if song:
             _LOGGER.debug(
@@ -272,6 +281,7 @@ class GeniusLyricsSensor(SensorEntity):
         # all checks out..update artist and title to fetch
         self._media_artist = new_state.attributes.get(ATTR_MEDIA_ARTIST)
         self._media_title = new_state.attributes.get(ATTR_MEDIA_TITLE)
+        self._media_album = new_state.attributes.get(ATTR_MEDIA_ALBUM_NAME)
         self._attr_extra_state_attributes[ATTR_MEDIA_LYRICS] = None
         self._attr_entity_picture = None
         self._state = STATE_ON

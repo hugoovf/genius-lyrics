@@ -6,7 +6,11 @@ from typing import Optional
 
 import voluptuous as vol
 
-from homeassistant.components.media_player import ATTR_MEDIA_ARTIST, ATTR_MEDIA_TITLE
+from homeassistant.components.media_player import (
+    ATTR_MEDIA_ALBUM_NAME,
+    ATTR_MEDIA_ARTIST,
+    ATTR_MEDIA_TITLE,
+)
 from homeassistant.const import CONF_ENTITY_ID, STATE_OFF, STATE_ON
 from homeassistant.core import (
     HomeAssistant,
@@ -27,7 +31,7 @@ from .const import (
     SERVICE_SEARCH_LYRICS,
 )
 from .genius import GeniusPatched
-from .helpers import clean_artist_name, cleanup_lyrics
+from .helpers import cleanup_lyrics, parse_artist_album
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,12 +67,13 @@ async def search_lyrics(
         _LOGGER.error("Must provide both artist and title")
         return
 
-    # clean artist name to remove album info
-    artist = clean_artist_name(artist)
-
+    # parse artist name and extract album info
+    cleaned_artist, extracted_album = parse_artist_album(artist)
+    
     attrs = {
-        ATTR_MEDIA_ARTIST: artist,
+        ATTR_MEDIA_ARTIST: cleaned_artist,
         ATTR_MEDIA_TITLE: title,
+        ATTR_MEDIA_ALBUM_NAME: extracted_album,
         ATTR_MEDIA_LYRICS: None,
         ATTR_MEDIA_IMAGE: None,
         ATTR_MEDIA_PYONG_COUNT: None,
@@ -80,10 +85,14 @@ async def search_lyrics(
         old_state = hass.states.get(entity_id)
         if old_state:
             attrs = dict(old_state.attributes)
+            # Update with cleaned artist and extracted album
+            attrs[ATTR_MEDIA_ARTIST] = cleaned_artist
+            if extracted_album and not attrs.get(ATTR_MEDIA_ALBUM_NAME):
+                attrs[ATTR_MEDIA_ALBUM_NAME] = extracted_album
 
     # perform fetch
     def fetch_lyrics():
-        return genius.search_song(title, artist, get_full_info=False)
+        return genius.search_song(title, cleaned_artist, get_full_info=False)
 
     song = await hass.async_add_executor_job(fetch_lyrics)
     if song:
