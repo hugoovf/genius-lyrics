@@ -46,7 +46,7 @@ from .const import (
     INTEGRATION_NAME,
 )
 from .genius import GeniusPatched
-from .helpers import clean_song_title, cleanup_lyrics, get_media_player_entities
+from .helpers import clean_artist_name, clean_song_title, cleanup_lyrics, get_media_player_entities
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -117,6 +117,14 @@ class GeniusLyricsSensor(SensorEntity):
         if self._media_artist is None or self._media_title is None:
             _LOGGER.error("Cannot fetch lyrics without artist and title")
             return
+
+        # clean artist name to remove album info and increase accuracy
+        cleaned_artist = clean_artist_name(self._media_artist)
+        if cleaned_artist != self._media_artist:
+            _LOGGER.info(
+                f'Media artist was cleaned: "{self._media_artist}"  ->  "{cleaned_artist}"'
+            )
+            self._media_artist = cleaned_artist
 
         # clean song title to increase chance and accuracy of a result
         cleaned_title = clean_song_title(self._media_title)

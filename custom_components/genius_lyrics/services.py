@@ -27,7 +27,7 @@ from .const import (
     SERVICE_SEARCH_LYRICS,
 )
 from .genius import GeniusPatched
-from .helpers import cleanup_lyrics
+from .helpers import clean_artist_name, cleanup_lyrics
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,6 +62,9 @@ async def search_lyrics(
     if artist is None or title is None:
         _LOGGER.error("Must provide both artist and title")
         return
+
+    # clean artist name to remove album info
+    artist = clean_artist_name(artist)
 
     attrs = {
         ATTR_MEDIA_ARTIST: artist,

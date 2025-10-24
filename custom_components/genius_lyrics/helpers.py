@@ -12,6 +12,27 @@ from homeassistant.core import HomeAssistant
 _LOGGER = logging.getLogger(__name__)
 
 
+def clean_artist_name(artist_name):
+    """Clean artist name string by removing album info and other metadata.
+    
+    This handles cases where media players (like Apple Music via HASS.Agent)
+    include album information in the artist field, e.g.:
+    "Katy Perry — PRISM (Deluxe Version)" -> "Katy Perry"
+    """
+    if not artist_name:
+        return artist_name
+    
+    # Remove album info after em dash (—) or regular dash (-)
+    # Common pattern: "Artist — Album Name" or "Artist - Album Name"
+    cleaned_name = re.split(r'\s+[—\-]\s+', artist_name)[0]
+    
+    # Remove any content in parentheses or brackets at the end
+    # This handles cases like "Artist (Album Edition)" or "Artist [Label]"
+    cleaned_name = re.sub(r'\s*[\(\[][^\)\]]*[\)\]]\s*$', '', cleaned_name)
+    
+    return cleaned_name.strip()
+
+
 def clean_song_title(song_title):
     """Clean song title string by removing metadata that may appear."""
 
